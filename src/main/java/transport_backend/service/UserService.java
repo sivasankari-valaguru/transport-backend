@@ -20,16 +20,31 @@ public class UserService {
 
     public LoginResponse login(LoginRequest request) {
 
-        User user = repository.findByEmail(request.getEmail())
-                .orElseThrow(() ->
-                        new RuntimeException("User Not Found"));
+        System.out.println("LOGIN REQUEST");
+        System.out.println("Username/Email: " + request.getEmail());
 
-        if (!user.getPassword().equals(request.getPassword())) {
-            throw new RuntimeException("Invalid Password");
+        User user = repository.findByEmail(request.getEmail().trim())
+                .orElseGet(() ->
+                    repository.findByUsername(request.getEmail().trim())
+                        .orElseThrow(() ->
+                            new RuntimeException(
+                                "User not found: " + request.getEmail()
+                            )
+                        )
+                );
+
+        System.out.println("USER FOUND: " + user.getUsername());
+        System.out.println("ROLE: " + user.getRole());
+
+        if (user.getPassword() == null) {
+            throw new RuntimeException("Password is NULL in database");
         }
 
-        String token =
-                jwtService.generateToken(user.getEmail());
+        if (!user.getPassword().equals(request.getPassword())) {
+            throw new RuntimeException("Invalid password");
+        }
+
+        String token = jwtService.generateToken(user.getEmail());
 
         return new LoginResponse(
                 "Login Successful",
