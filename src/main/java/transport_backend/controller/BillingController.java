@@ -20,7 +20,7 @@ public class BillingController {
     public List<Billing> getAllBills() {
         return service.getAllBills();
     }
-
+ 
     @GetMapping("/{id}")
     public Billing getBill(@PathVariable Long id) {
         return service.getBillById(id);
