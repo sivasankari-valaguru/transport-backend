@@ -21,13 +21,15 @@ public class UserService {
     public LoginResponse login(LoginRequest request) {
 
         User user = repository.findByEmail(request.getEmail())
-                .orElseThrow(() -> new RuntimeException("User Not Found"));
+                .orElseThrow(() ->
+                        new RuntimeException("User Not Found"));
 
         if (!user.getPassword().equals(request.getPassword())) {
             throw new RuntimeException("Invalid Password");
         }
 
-        String token = jwtService.generateToken(user.getEmail());
+        String token =
+                jwtService.generateToken(user.getEmail());
 
         return new LoginResponse(
                 "Login Successful",

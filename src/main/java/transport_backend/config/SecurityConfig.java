@@ -1,6 +1,5 @@
 package transport_backend.config;
 
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -22,50 +21,55 @@ import java.util.Arrays;
 @Configuration
 public class SecurityConfig {
 
-    @Autowired
-    private JwtAuthenticationFilter jwtFilter;
+    private final JwtAuthenticationFilter jwtFilter;
+
+    public SecurityConfig(JwtAuthenticationFilter jwtFilter) {
+        this.jwtFilter = jwtFilter;
+    }
 
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
 
         http
-
-            // Disable CSRF
+            // Disable CSRF because this is a REST API
             .csrf(csrf -> csrf.disable())
 
             // Enable CORS
             .cors(cors -> cors.configurationSource(corsConfigurationSource()))
 
-            // No Session
+            // JWT authentication - no HTTP session
             .sessionManagement(session ->
-                    session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                session.sessionCreationPolicy(SessionCreationPolicy.STATELESS)
+            )
 
             // Authorization
             .authorizeHttpRequests(auth -> auth
 
-                    // Public APIs
-                    .requestMatchers(
-                            "/",
-                            "/api/login",
-                            "/api/register",
-                            "/swagger-ui/**",
-                            "/swagger-ui.html",
-                            "/v3/api-docs/**"
-                    ).permitAll()
+                // Public endpoints
+                .requestMatchers(
+                    "/",
+                    "/api/login",
+                    "/api/register",
+                    "/swagger-ui/**",
+                    "/swagger-ui.html",
+                    "/v3/api-docs/**",
+                    "/error"
+                ).permitAll()
 
-                    // Secure all remaining APIs
-                    .anyRequest().authenticated()
+                // Everything else requires JWT
+                .anyRequest().authenticated()
             )
 
-            // Disable Spring Login Page
+            // Disable default login page
             .formLogin(form -> form.disable())
 
+            // Disable Basic Authentication
             .httpBasic(httpBasic -> httpBasic.disable())
 
-            // JWT Filter
+            // JWT filter
             .addFilterBefore(
-                    jwtFilter,
-                    UsernamePasswordAuthenticationFilter.class
+                jwtFilter,
+                UsernamePasswordAuthenticationFilter.class
             );
 
         return http.build();
@@ -84,26 +88,37 @@ public class SecurityConfig {
 
         CorsConfiguration configuration = new CorsConfiguration();
 
-        configuration.setAllowedOrigins(Arrays.asList(
-                "http://localhost:5173"
+        // Allow local React/Vite and Vercel
+        configuration.setAllowedOriginPatterns(Arrays.asList(
+            "http://localhost:5173",
+            "https://*.vercel.app"
         ));
 
+        // Allowed HTTP methods
         configuration.setAllowedMethods(Arrays.asList(
-                "GET",
-                "POST",
-                "PUT",
-                "DELETE",
-                "OPTIONS"
+            "GET",
+            "POST",
+            "PUT",
+            "DELETE",
+            "PATCH",
+            "OPTIONS"
         ));
 
-        configuration.setAllowedHeaders(Arrays.asList("*"));
+        // Allow request headers
+        configuration.setAllowedHeaders(Arrays.asList(
+            "*"
+        ));
 
+        // Allow Authorization header/cookies
         configuration.setAllowCredentials(true);
 
         UrlBasedCorsConfigurationSource source =
-                new UrlBasedCorsConfigurationSource();
+            new UrlBasedCorsConfigurationSource();
 
-        source.registerCorsConfiguration("/**", configuration);
+        source.registerCorsConfiguration(
+            "/**",
+            configuration
+        );
 
         return source;
     }

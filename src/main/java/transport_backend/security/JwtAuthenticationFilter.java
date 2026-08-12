@@ -3,11 +3,13 @@ package transport_backend.security;
 import java.io.IOException;
 import java.util.Collections;
 
+import org.springframework.stereotype.Component;
 import org.springframework.beans.factory.annotation.Autowired;
+
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
-import org.springframework.stereotype.Component;
+
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import jakarta.servlet.FilterChain;
@@ -30,39 +32,78 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
         String requestPath = request.getServletPath();
 
-        // Allow login, register and Swagger without JWT
+        // ============================================
+        // PUBLIC ENDPOINTS
+        // No JWT token required
+        // ============================================
+
         if (requestPath.equals("/api/login")
                 || requestPath.equals("/api/register")
+                || requestPath.equals("/")
                 || requestPath.startsWith("/swagger-ui")
-                || requestPath.startsWith("/v3/api-docs")) {
+                || requestPath.startsWith("/v3/api-docs")
+                || requestPath.equals("/error")) {
 
             filterChain.doFilter(request, response);
             return;
         }
+
+        // ============================================
+        // GET AUTHORIZATION HEADER
+        // ============================================
 
         String authHeader = request.getHeader("Authorization");
 
-        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+        // No token
+        if (authHeader == null
+                || !authHeader.startsWith("Bearer ")) {
+
             filterChain.doFilter(request, response);
             return;
         }
 
+        // ============================================
+        // EXTRACT JWT TOKEN
+        // ============================================
+
         String token = authHeader.substring(7);
 
-        if (jwtService.validateToken(token)) {
+        try {
 
-            String email = jwtService.extractUsername(token);
+            // ============================================
+            // VALIDATE TOKEN
+            // ============================================
 
-            UsernamePasswordAuthenticationToken authentication =
-                    new UsernamePasswordAuthenticationToken(
-                            email,
-                            null,
-                            Collections.emptyList());
+            if (jwtService.validateToken(token)) {
 
-            authentication.setDetails(
-                    new WebAuthenticationDetailsSource().buildDetails(request));
+                String email =
+                        jwtService.extractUsername(token);
 
-            SecurityContextHolder.getContext().setAuthentication(authentication);
+                UsernamePasswordAuthenticationToken authentication =
+                        new UsernamePasswordAuthenticationToken(
+                                email,
+                                null,
+                                Collections.emptyList()
+                        );
+
+                authentication.setDetails(
+                        new WebAuthenticationDetailsSource()
+                                .buildDetails(request)
+                );
+
+                SecurityContextHolder
+                        .getContext()
+                        .setAuthentication(authentication);
+            }
+
+        } catch (Exception e) {
+
+            // Invalid/expired token.
+            // Continue the filter chain.
+            // Spring Security will decide whether the
+            // requested endpoint requires authentication.
+
+            SecurityContextHolder.clearContext();
         }
 
         filterChain.doFilter(request, response);
